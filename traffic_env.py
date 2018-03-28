@@ -19,6 +19,7 @@ class Bus:
             self.terminate_flag = True
             # unload passenger at terminal state
             self.states[-1] += (self.capacity - self.empty)
+            self.empty = self.capacity
 
     def take_passenger(self):
         if self.station != self.terminal_station:
@@ -34,28 +35,37 @@ class Bus:
 
 class TrafficSimulator:
     def __init__(self,
-                 states=[10, 10, 10, 10, 0],  # initial conditions at each station
-                 goal_state=[0, 0, 0, 0, 40],
-                 actions={'wait':0,'sendA':1,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C
-                 traffic_condition=[10, 1, 1, 1]  # time required between each station
+                 states=[20, 0, 0, 50, 0],  # initial conditions at each station
+                 goal_state=[0, 0, 0, 0, 70],
+                 actions_dict={'wait':0,'sendA':1}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
+                 traffic_condition=[10, 1, 1, 1],  # time required between each station
+                 bus_cost=25,  # cost for starting a new bus
                  ):
         self.time = 0
-        self.states = states
+        self.initial_states = states.copy()
+        self.states = states.copy()
         self.goal_state = goal_state
-        self.actions = actions
+        self.actions = actions_dict.keys()
+        self.actions_dict = actions_dict
         self.traffic_condition = traffic_condition
         # initial buses
         self.buses = [Bus(self.states)]
+        self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
+        self.twostates = (tuple(self.states), tuple(self.bus_states))
         self.total_reward = 0
+        self.bus_cost = bus_cost
+        self.game_over = False
+        self.pi = []
 
     def play(self, action):
-        if action not in self.actions.keys():
+        self.pi.append(action)
+        if action not in self.actions:
             return -1
         # add extra bus if action is not wait
-        pay_driver = 0
+        extra_bus_fee = 0
         if action != 'wait':
-            self.buses.append(Bus(self.states, init_station=self.actions[action]))
-            pay_driver = -25
+            self.buses.append(Bus(self.states, init_station=self.actions_dict[action]))
+            extra_bus_fee = -1 * self.bus_cost
         # loading bus, move bus
         for bus in self.buses:
             if bus.terminate_flag:
@@ -65,10 +75,24 @@ class TrafficSimulator:
             if bus.time_count == self.traffic_condition[bus.station]:
                 bus.arrival()
 
+        self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
+        self.twostates = (tuple(self.states), tuple(self.bus_states))
         self.time += 1
-        reward = -1*sum(self.states[:-1])
-        self.total_reward += reward + pay_driver
+        reward = -1 * sum(self.states[:-1]) - 1 * sum(self.bus_states)
+        self.total_reward += (reward + extra_bus_fee)
 
-        return reward, self.states
+        if self.states == self.goal_state:
+            print(self.pi)
+            self.game_over = True
 
+        print(self.twostates, reward, self.total_reward)
+        return self.twostates, reward
 
+    def reset(self):
+        self.time = 0
+        self.states = self.initial_states.copy()
+        self.buses = [Bus(self.states)]
+        self.total_reward = 0
+        self.game_over = False
+        self.pi = []
+        # self.__init__() -> this doesnt work when using not default arguments in init
