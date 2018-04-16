@@ -2,15 +2,16 @@ import DynaQ_traffic
 import matplotlib.pyplot as plot
 import traffic_env
 
-game = traffic_env.TrafficSimulator(bus_cost=50)
+game = traffic_env.TrafficSimulator(bus_cost=500)
 
 n_eps = 1000
 
 dynaq = DynaQ_traffic.DynaQ(game)
 
 # set parameters
-dynaq.n = 3
-dynaq.alpha = 0.7
+# this parameter defines how many steps dynaq learns from experiences
+dynaq.n = 0
+dynaq.alpha = 0.9
 dynaq.epslon = 0.01
 dynaq.verbose = True
 
