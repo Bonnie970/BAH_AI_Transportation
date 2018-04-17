@@ -4,7 +4,7 @@ import traffic_env
 
 game = traffic_env.TrafficSimulator(bus_cost=50)
 
-n_eps = 200
+n_eps = 300
 
 dynaq = DynaQ_traffic.DynaQ(game)
 

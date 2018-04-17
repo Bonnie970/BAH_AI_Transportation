@@ -35,9 +35,9 @@ class Bus:
 
 class TrafficSimulator:
     def __init__(self,
-                 states=[20, 50, 0, 0, 0],  # initial conditions at each station
+                 states=[20, 0, 0, 50, 0],  # initial conditions at each station
                  goal_state=[0, 0, 0, 0, 70],
-                 actions_dict={'wait':0,'sendA':1}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
+                 actions_dict={'wait':0,'sendA':1,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
                  traffic_condition=[10, 1, 1, 1],  # time required between each station
                  bus_cost=500,  # cost for starting a new bus
                  ):
