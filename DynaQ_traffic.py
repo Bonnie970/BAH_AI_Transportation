@@ -42,9 +42,10 @@ class DynaQ:
             s = self.s
             # get action from epslon-greedy
             a = np.random.choice(e_greedy(self.epslon, s, self.Q, self.actions), 1)[0]
+
             # tell game agent to execute action a
             s_next, r = self.game.play(a)
-
+            # print('#A: ', a, ' s_next: ', s_next, ' r: ', r)
 
             self.steps += 1
 
@@ -62,6 +63,7 @@ class DynaQ:
             self.Q[s][a] += self.alpha * (\
                 r + self.gamma * max(self.Q[s_next].values()) \
                 - self.Q[s][a])
+            #print('Q UPDATING', self.Q)
 
             # update model
             self.model.insert(s, a, s_next, r)

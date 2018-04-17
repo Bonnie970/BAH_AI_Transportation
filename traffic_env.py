@@ -35,7 +35,7 @@ class Bus:
 
 class TrafficSimulator:
     def __init__(self,
-                 states=[20, 0, 0, 50, 0],  # initial conditions at each station
+                 states=[20, 50, 0, 0, 0],  # initial conditions at each station
                  goal_state=[0, 0, 0, 0, 70],
                  actions_dict={'wait':0,'sendA':1}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
                  traffic_condition=[10, 1, 1, 1],  # time required between each station
@@ -78,14 +78,14 @@ class TrafficSimulator:
         self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
         self.twostates = tuple(self.states)#(tuple(self.states), tuple(self.bus_states))
         self.time += 1
-        reward = -1 * sum(self.states[:-1]) #- 0.5 * sum(self.bus_states)
+        reward = -1 * sum(self.states[:-1]) + extra_bus_fee #- 0.5 * sum(self.bus_states)
         self.total_reward += (reward + extra_bus_fee)
 
         if self.states == self.goal_state:
             print(self.pi)
             self.game_over = True
 
-        print(self.twostates, reward, self.total_reward)
+        # print('ACTION', action, 'STATE: ', self.twostates,'REWARD: ', reward, 'TOTAL REWARD: ', self.total_reward)
         return self.twostates, reward
 
     def reset(self):

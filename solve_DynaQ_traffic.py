@@ -2,9 +2,9 @@ import DynaQ_traffic
 import matplotlib.pyplot as plot
 import traffic_env
 
-game = traffic_env.TrafficSimulator(bus_cost=500)
+game = traffic_env.TrafficSimulator(bus_cost=50)
 
-n_eps = 1000
+n_eps = 200
 
 dynaq = DynaQ_traffic.DynaQ(game)
 
