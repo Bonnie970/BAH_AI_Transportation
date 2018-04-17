@@ -26,7 +26,7 @@ class DynaQ:
         self.actions = self.game.actions
 
         # initial Q(s,a) and Model(s,a)
-        s = self.game.state
+        s = self.game.state_to_str()
         self.Q = dict()
         self.Q[s] = dict(zip(self.actions, [0]*len(self.actions)))
 
@@ -36,9 +36,11 @@ class DynaQ:
 
     def run(self):
         rewards = []
+        steps = []
+        buses = []
         for episode in range(self.num_episodes):
 
-            steps = 0
+            step = 0
             s = self.game.reset()
             while not self.game.game_over:
                 # get action from epslon-greedy
@@ -66,14 +68,16 @@ class DynaQ:
 
                 # current state is next state
                 s = s_next
-                steps += 1
+                step += 1
 
             rewards.append(self.game.total_reward)
+            steps.append(step)
+            buses.append(len(self.game.buses))
 
             if self.verbose and episode % 50 == 0:
-                print('Episode {} over, reward: {}, step: {}'.format(episode, self.game.total_reward, steps))
+                print('Episode {} over, reward: {}, step: {}'.format(episode, self.game.total_reward, step))
 
-        return rewards
+        return rewards, steps, buses
 
 
 class Model:

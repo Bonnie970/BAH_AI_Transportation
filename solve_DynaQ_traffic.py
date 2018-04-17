@@ -7,9 +7,11 @@ from scipy.signal import savgol_filter
 ########################################################################################################################
 
 # plots the results of tests
-def plotstats(test_name,
-              stats_dict,
+def plotstats(stats_dict,
               num_episodes,
+              test_name="Test",
+              x_axis_name="X axis",
+              y_axis_name="Y axis",
               max_savgol_winsize=151,
               min_savgol_winsize=15
               ):
@@ -32,7 +34,7 @@ def plotstats(test_name,
 
     # setup visuals
     ax1.set_xlabel("Episode")
-    ax1.set_ylabel("Reward")
+    ax1.set_ylabel(y_axis_name)
 
     # process data
     episodes = np.arange(num_episodes)
@@ -66,6 +68,9 @@ game = traffic_env.TrafficSimulator()
 n_eps = 5000
 
 dynaq = DynaQ_traffic.DynaQ(game, num_episodes=n_eps)
-rewards = dynaq.run()
+rewards, steps, buses = dynaq.run()
 
-plotstats("Test 1", {"Configuration 1": rewards}, n_eps)
+plotstats({"Configuration 1": rewards}, n_eps, x_axis_name="Episodes", y_axis_name="Rewards")
+plotstats({"Configuration 1": steps}, n_eps, x_axis_name="Episodes", y_axis_name="Steps")
+plotstats({"Configuration 1": buses}, n_eps, x_axis_name="Episodes", y_axis_name="Buses sent")
+

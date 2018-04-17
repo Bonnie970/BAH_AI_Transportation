@@ -39,11 +39,10 @@ class TrafficSimulator:
     def __init__(self,
                  states=    [0, 110, 0, 0, 50, 0, 0, 50, 0],  # initial conditions at each station
                  goal_state=[0, 0, 0, 0, 0, 0, 0, 0, 210],
-                 actions_dict={"send{}".format(i): i for i in range(9)}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
-                 traffic_condition=[10, 1, 1, 1, 1, 1, 1, 1, 1],  # time required between each station
-                 bus_cost=1000,  # cost for starting a new bus
+                 actions_dict={'wait': -1, "send0": 0}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
+                 traffic_condition=[1, 1, 1, 1, 1, 1, 1, 1, 1],  # time required between each station
+                 bus_cost=100,  # cost for starting a new bus
                  ):
-        actions_dict['wait'] = 0
 
         self.time = 0
         self.initial_states = states.copy()
@@ -82,15 +81,17 @@ class TrafficSimulator:
         # self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
         self.state = self.state_to_str() #(tuple(self.states), tuple(self.bus_states))
         self.time += 1
+
         current_reward = -1 * sum(self.states[:-1]) + extra_bus_fee
         self.total_reward += current_reward
+
+        # print("PLAYED ACTION", action, self.state, self.states, current_reward, self.total_reward)
 
         if self.states == self.goal_state:
             # print("PI:", self.pi)
             print("Send", len(self.buses), "buses.")
             self.game_over = True
 
-        # print("PLAYED ACTION", action, self.state, self.states, current_reward, self.total_reward)
         return self.state, current_reward
 
     def reset(self):
@@ -104,9 +105,9 @@ class TrafficSimulator:
         return self.state
 
     def state_to_str(self):
-        state_str = ":"
+        state_str = 0
         for state in self.states:
-            state_str += ("F" if state == 0 else "T") + ":"
-        return state_str
+            state_str += state
+        return "" + str(state_str)
 
 

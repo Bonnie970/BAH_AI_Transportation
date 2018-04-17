@@ -1,37 +1,59 @@
+import numpy as np
+
+class Passenger:
+    def __init__(self,
+                 start_time_step,
+                 destination):
+        self.start_time_step = start_time_step
+        self.destination = destination
+
 class BusA:
     def __init__(self,
-                 current_passengers,
+                 time_to_next_station,
                  capacity=50,
                  ):
+        self.time_to_destination = time_to_next_station
+
         self.capacity = capacity
-        self.current_passengers = 0
+        self.passengers = []
 
     # returns number of passengers that could be loaded
-    def load_passengers(self, num_passengers):
-        loaded_passengers = 0
+    def load_passengers(self, passengers):
+        num_loaded_passengers = 0
 
-        available_capacity = self.capacity - self.current_passengers
+        passengers_sorted_by_time = sorted(passengers, key=lambda passenger: passenger.start_time_step)
 
-        if available_capacity >= num_passengers:
-            loaded_passengers = num_passengers
-        else:
-            loaded_passengers = available_capacity
+        available_capacity = self.capacity - len(self.passengers)
+        while available_capacity < num_loaded_passengers:
+            passenger = passengers_sorted_by_time.pop(0)
+            if not passenger is None:
+                self.passengers.append(passenger)
+                num_loaded_passengers += 1
+            else:
+                break
 
-        self.current_passengers += loaded_passengers
+        return num_loaded_passengers
 
-        return loaded_passengers
+    # returns passengers that were unloaded
+    def unload_all_passengers(self):
+        unloaded_passengers = self.passengers.copy()
+        self.passengers = []
+        return unloaded_passengers
 
-    # returns number of passengers that were unloaded
     def unload_passengers(self):
-        current_passengers = self.current_passengers
-        self.current_passengers = 0
-        return current_passengers
+        pass
+
+    def step(self,):
+        self.time_to_destination -= 1
+
+
 
 
 # skeleton for a Dyna game
+# define each of these
 class DynaQGame:
     def __init__(self):
-        self.state = tuple(None)
+        self.state = ""
         self.actions = []
         self.game_over = False
         self.total_reward = 0
@@ -42,15 +64,33 @@ class DynaQGame:
     def reset(self):
         pass
 
+
+
+class Environment:
+    def __init__(self,
+                 actions_dict={'wait': -1, 'send0': 0},
+                 time_between_stations=np.array([10, 1, 1, 1]),  # time required between each station
+                 ):
+        pass
+        # self.initial_passengers = passengers_per_station_init.copy()
+
+        # self.stations = passengers_per_station_init.copy()
+
+
+
+    def add_passengers(self, num_station, num_passengers):
+        pass
+
 class TrafficSimulatorA:
     def __init__(self,
-                 passengers_per_station=[20, 0, 0, 50, 0],  # initial conditions at each station
-                 passengers_per_station_goal=[0, 0, 0, 0, 70],
-                 actions_dict={'wait': 0,'sendA': 1}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
-                 time_between_stations=[10, 1, 1, 1],  # time required between each station
+                 environment,
                  penalty_per_bus=10,  # cost for starting a new bus
                  ):
         self.time_step = 0
+
+    def step(self):
+        for bus in self.buses:
+            bus.step()
 
 
     def play(self, action):
