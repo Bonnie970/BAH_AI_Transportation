@@ -1,11 +1,13 @@
+import numpy as np
+
 class Bus:
-    def __init__(self, states, capacity=50, init_station=0, terminal_station=4):
+    def __init__(self, states, capacity=50, init_station=0):
         self.capacity = capacity
         self.empty = self.capacity
         # count time between consecutive stations, reset at arrival of station
         self.time_count = 0
         self.station = init_station
-        self.terminal_station = terminal_station
+        self.terminal_station = len(states)
         self.states = states
         self.terminate_flag = self.station==self.terminal_station
 
@@ -35,12 +37,14 @@ class Bus:
 
 class TrafficSimulator:
     def __init__(self,
-                 states=[20, 0, 0, 50, 0],  # initial conditions at each station
-                 goal_state=[0, 0, 0, 0, 70],
-                 actions_dict={'wait':0,'sendA':1}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
-                 traffic_condition=[10, 1, 1, 1],  # time required between each station
-                 bus_cost=10,  # cost for starting a new bus
+                 states=    [0, 110, 0, 0, 50, 0, 0, 50, 0],  # initial conditions at each station
+                 goal_state=[0, 0, 0, 0, 0, 0, 0, 0, 210],
+                 actions_dict={"send{}".format(i): i for i in range(9)}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
+                 traffic_condition=[10, 1, 1, 1, 1, 1, 1, 1, 1],  # time required between each station
+                 bus_cost=1000,  # cost for starting a new bus
                  ):
+        actions_dict['wait'] = 0
+
         self.time = 0
         self.initial_states = states.copy()
         self.states = states.copy()
@@ -49,9 +53,9 @@ class TrafficSimulator:
         self.actions_dict = actions_dict
         self.traffic_condition = traffic_condition
         # initial buses
-        self.buses = [Bus(self.states)]
-        self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
-        self.state = tuple(self.states)#(tuple(self.states), tuple(self.bus_states))
+        self.buses = []
+        # self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
+        self.state = self.state_to_str()#(tuple(self.states), tuple(self.bus_states))
         self.total_reward = 0
         self.bus_cost = bus_cost
         self.game_over = False
@@ -75,24 +79,34 @@ class TrafficSimulator:
             if bus.time_count == self.traffic_condition[bus.station]:
                 bus.arrival()
 
-        self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
-        self.state = tuple(self.states)#(tuple(self.states), tuple(self.bus_states))
+        # self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
+        self.state = self.state_to_str() #(tuple(self.states), tuple(self.bus_states))
         self.time += 1
-        reward = -1 * sum(self.states[:-1]) #- 0.5 * sum(self.bus_states)
-        self.total_reward += (reward + extra_bus_fee)
+        current_reward = -1 * sum(self.states[:-1]) + extra_bus_fee
+        self.total_reward += current_reward
 
         if self.states == self.goal_state:
-            print(self.pi)
+            # print("PI:", self.pi)
+            print("Send", len(self.buses), "buses.")
             self.game_over = True
 
-        print(self.state, reward, self.total_reward)
-        return self.state, reward
+        # print("PLAYED ACTION", action, self.state, self.states, current_reward, self.total_reward)
+        return self.state, current_reward
 
     def reset(self):
         self.time = 0
         self.states = self.initial_states.copy()
-        self.buses = [Bus(self.states)]
+        self.state = self.state_to_str()
+        self.buses = []
         self.total_reward = 0
         self.game_over = False
         self.pi = []
-        return tuple(self.states)
+        return self.state
+
+    def state_to_str(self):
+        state_str = ":"
+        for state in self.states:
+            state_str += ("F" if state == 0 else "T") + ":"
+        return state_str
+
+

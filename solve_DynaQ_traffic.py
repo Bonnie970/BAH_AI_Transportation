@@ -61,19 +61,11 @@ def plotstats(test_name,
 
 ########################################################################################################################
 
-game = traffic_env.TrafficSimulator(bus_cost=500)
+game = traffic_env.TrafficSimulator()
 
-n_eps = 2000
+n_eps = 5000
 
-dynaq = DynaQ_traffic.DynaQ(game, n_eps)
-
-# set parameters
-# this parameter defines how many steps dynaq learns from experiences
-dynaq.n = 0
-dynaq.alpha = 0.99
-dynaq.epslon = 0.01
-dynaq.verbose = True
-
+dynaq = DynaQ_traffic.DynaQ(game, num_episodes=n_eps)
 rewards = dynaq.run()
 
 plotstats("Test 1", {"Configuration 1": rewards}, n_eps)

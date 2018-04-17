@@ -1,91 +1,77 @@
 import numpy as np
 
 class DynaQ:
-    def __init__(self, game, n_eps):
-        self.n_eps = n_eps
+    def __init__(self,
+                 game,
+                 alpha=0.1,
+                 gamma=0.95,
+                 epsilon=0.05,
+                 n_planning_steps=3,
+                 num_episodes=10000,
+                 verbose=True):
+        self.num_episodes = num_episodes
 
         # step sizeimport numpy as np
 
-        self.alpha = 0.7  # 0.1
+        self.alpha = alpha
         # discount
-        self.gamma = 0.95
+        self.gamma = gamma
         # greed algorithm factor
-        self.epslon = 0.1
+        self.epsilon = epsilon
         # planning steps
-        self.n = 5
-
-        self.mazeIndex = 0
-        self.changeMaze = False
+        self.n_planning_steps = n_planning_steps
 
         self.game = game
-        self.episode = 0
-
-        # get initial state of game
-        self.s = self.game.state
-
-        # cumulative reward, steps
-        self.steps = 0
 
         self.actions = self.game.actions
 
         # initial Q(s,a) and Model(s,a)
+        s = self.game.state
         self.Q = dict()
-        print(self.s, type(self.s))
-        self.Q[self.s] = dict(zip(self.actions, [0]*len(self.actions)))
+        self.Q[s] = dict(zip(self.actions, [0]*len(self.actions)))
+
         self.model = Model()
 
-        self.verbose = False
+        self.verbose = verbose
 
     def run(self):
         rewards = []
-        for _ in range(self.n_eps):
+        for episode in range(self.num_episodes):
 
+            steps = 0
+            s = self.game.reset()
             while not self.game.game_over:
-                # current state
-                s = self.s
                 # get action from epslon-greedy
-                a = np.random.choice(e_greedy(self.epslon, s, self.Q, self.actions), 1)[0]
+                a = np.random.choice(e_greedy(self.epsilon, s, self.Q, self.actions), 1)[0]
                 # tell game agent to execute action a
                 s_next, r = self.game.play(a)
 
-                self.steps += 1
-
-                if self.verbose:
-                    if self.steps % 1000 == 0:
-                        print(self.steps)
-                        print(s, a, s_next, r)
+                # print("state", s_next, r)
 
                 # State-value: allocate space for new state and action
-                for involving_state in [s, s_next]:
-                    if involving_state not in self.Q.keys():
-                        self.Q[involving_state] = dict(zip(self.actions, [0]*len(self.actions)))
+                for state_q in [s, s_next]:
+                    if state_q not in self.Q.keys():
+                        self.Q[state_q] = dict(zip(self.actions, [0]*len(self.actions)))
 
                 # update State-value
-                self.Q[s][a] += self.alpha * (\
-                    r + self.gamma * max(self.Q[s_next].values()) \
-                    - self.Q[s][a])
+                self.Q[s][a] += self.alpha * (r + self.gamma * max(self.Q[s_next].values()) - self.Q[s][a])
 
                 # update model
                 self.model.insert(s, a, s_next, r)
 
                 # update Q using simulated experience from model
-                for _ in range(self.n):
+                for _ in range(self.n_planning_steps):
                     ss, sa, ss_next, sr = self.model.get_simulate_experience()
-                    self.Q[ss][sa] += self.alpha * ( \
-                        sr + self.gamma * max(self.Q[ss_next].values()) \
-                        - self.Q[ss][sa])
+                    self.Q[ss][sa] += self.alpha * (sr + self.gamma * max(self.Q[ss_next].values()) - self.Q[ss][sa])
 
                 # current state is next state
-                self.s = s_next
+                s = s_next
+                steps += 1
 
-            if self.game.game_over:
-                rewards.append(self.game.total_reward)
-                self.episode += 1
-                if self.verbose:
-                    print('Episode {} over, reward: {}, step: {}'.format(self.episode, self.game.total_reward, self.steps))
+            rewards.append(self.game.total_reward)
 
-                self.s = self.game.reset()
-                self.steps = 0
+            if self.verbose and episode % 50 == 0:
+                print('Episode {} over, reward: {}, step: {}'.format(episode, self.game.total_reward, steps))
 
         return rewards
 
@@ -117,9 +103,9 @@ class Model:
         return s, a, s_next, r
 
 
-def e_greedy(epslon, s, Q, actions):
-    # explore
-    if np.random.binomial(1, epslon) == 1:
+def e_greedy(epsilon, s, Q, actions):
+    if np.random.binomial(1, epsilon) == 1:
+        # explore
         return np.random.choice(list(actions), 1)
     else:
         # exploit
