@@ -1,7 +1,9 @@
 import numpy as np
 
 class DynaQ:
-    def __init__(self, game):
+    def __init__(self, game, n_eps):
+        self.n_eps = n_eps
+
         # step sizeimport numpy as np
 
         self.alpha = 0.7  # 0.1
@@ -19,11 +21,10 @@ class DynaQ:
         self.episode = 0
 
         # get initial state of game
-        self.s = self.game.twostates
+        self.s = self.game.state
 
         # cumulative reward, steps
         self.steps = 0
-        self.results = [[self.game.total_reward, self.episode]]
 
         self.actions = self.game.actions
 
@@ -36,54 +37,57 @@ class DynaQ:
         self.verbose = False
 
     def run(self):
+        rewards = []
+        for _ in range(self.n_eps):
 
-        while not self.game.game_over:
-            # current state
-            s = self.s
-            # get action from epslon-greedy
-            a = np.random.choice(e_greedy(self.epslon, s, self.Q, self.actions), 1)[0]
-            # tell game agent to execute action a
-            s_next, r = self.game.play(a)
+            while not self.game.game_over:
+                # current state
+                s = self.s
+                # get action from epslon-greedy
+                a = np.random.choice(e_greedy(self.epslon, s, self.Q, self.actions), 1)[0]
+                # tell game agent to execute action a
+                s_next, r = self.game.play(a)
 
+                self.steps += 1
 
-            self.steps += 1
+                if self.verbose:
+                    if self.steps % 1000 == 0:
+                        print(self.steps)
+                        print(s, a, s_next, r)
 
-            if self.verbose:
-                if self.steps % 1000 == 0:
-                    print(self.steps)
-                    print(s, a, s_next, r)
+                # State-value: allocate space for new state and action
+                for involving_state in [s, s_next]:
+                    if involving_state not in self.Q.keys():
+                        self.Q[involving_state] = dict(zip(self.actions, [0]*len(self.actions)))
 
-            # State-value: allocate space for new state and action
-            for involving_state in [s, s_next]:
-                if involving_state not in self.Q.keys():
-                    self.Q[involving_state] = dict(zip(self.actions, [0]*len(self.actions)))
+                # update State-value
+                self.Q[s][a] += self.alpha * (\
+                    r + self.gamma * max(self.Q[s_next].values()) \
+                    - self.Q[s][a])
 
-            # update State-value
-            self.Q[s][a] += self.alpha * (\
-                r + self.gamma * max(self.Q[s_next].values()) \
-                - self.Q[s][a])
+                # update model
+                self.model.insert(s, a, s_next, r)
 
-            # update model
-            self.model.insert(s, a, s_next, r)
+                # update Q using simulated experience from model
+                for _ in range(self.n):
+                    ss, sa, ss_next, sr = self.model.get_simulate_experience()
+                    self.Q[ss][sa] += self.alpha * ( \
+                        sr + self.gamma * max(self.Q[ss_next].values()) \
+                        - self.Q[ss][sa])
 
-            # update Q using simulated experience from model
-            for _ in range(self.n):
-                ss, sa, ss_next, sr = self.model.get_simulate_experience()
-                self.Q[ss][sa] += self.alpha * ( \
-                    sr + self.gamma * max(self.Q[ss_next].values()) \
-                    - self.Q[ss][sa])
+                # current state is next state
+                self.s = s_next
 
-            # current state is next state
-            self.s = s_next
+            if self.game.game_over:
+                rewards.append(self.game.total_reward)
+                self.episode += 1
+                if self.verbose:
+                    print('Episode {} over, reward: {}, step: {}'.format(self.episode, self.game.total_reward, self.steps))
 
-        if self.game.game_over:
-            self.episode += 1
-            if self.verbose:
-                print('Episode {} over, reward: {}, step: {}'.format(self.episode, self.game.total_reward, self.steps))
-            self.results.append([self.game.total_reward, self.episode])
-            self.game.reset()
-            self.s = self.game.twostates
-            self.steps = 0
+                self.s = self.game.reset()
+                self.steps = 0
+
+        return rewards
 
 
 class Model:
