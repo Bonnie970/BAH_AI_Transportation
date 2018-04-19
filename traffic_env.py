@@ -1,9 +1,9 @@
 import numpy as np
 
 class Bus:
-    def __init__(self, states, capacity=50, init_station=0):
+    def __init__(self, states, capacity=1, init_station=0):
         self.capacity = capacity
-        self.empty = self.capacity
+        self.empty_capacity = self.capacity
         # count time between consecutive stations, reset at arrival of station
         self.time_count = 0
         self.station = init_station
@@ -20,28 +20,28 @@ class Bus:
         if self.station == self.terminal_station:
             self.terminate_flag = True
             # unload passenger at terminal state
-            self.states[-1] += (self.capacity - self.empty)
-            self.empty = self.capacity
+            self.states[-1] += (self.capacity - self.empty_capacity)
+            self.empty_capacity = self.capacity
 
     def take_passenger(self):
         if self.station != self.terminal_station:
             # check if bus has enough seats to take all ppl at current station
             num_passenger = self.states[self.station]
-            if self.empty >= num_passenger:
-                self.empty -= num_passenger
+            if self.empty_capacity >= num_passenger:
+                self.empty_capacity -= num_passenger
                 self.states[self.station] = 0
             else:
-                self.states[self.station] -= self.empty
-                self.empty = 0
+                self.states[self.station] -= self.empty_capacity
+                self.empty_capacity = 0
 
 
 class TrafficSimulator:
     def __init__(self,
-                 states=    [0, 110, 0, 0, 50, 0, 0, 50, 0],  # initial conditions at each station
-                 goal_state=[0, 0, 0, 0, 0, 0, 0, 0, 210],
+                 states=    [0, 2, 0, 0, 1, 0, 0, 1, 0],  # initial conditions at each station
+                 goal_state=[0, 0, 0, 0, 0, 0, 0, 0, 4],
                  actions_dict={'wait': -1, "send0": 0}, #,'sendB':2,'sendC':3},  # wait, send new bus at A, B, or C, number corresponds to position A,B,C
                  traffic_condition=[1, 1, 1, 1, 1, 1, 1, 1, 1],  # time required between each station
-                 bus_cost=100,  # cost for starting a new bus
+                 bus_cost=1,  # cost for starting a new bus
                  ):
 
         self.time = 0
@@ -53,8 +53,7 @@ class TrafficSimulator:
         self.traffic_condition = traffic_condition
         # initial buses
         self.buses = []
-        # self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
-        self.state = self.state_to_str()#(tuple(self.states), tuple(self.bus_states))
+        self.state = self.state_to_str()
         self.total_reward = 0
         self.bus_cost = bus_cost
         self.game_over = False
@@ -78,11 +77,10 @@ class TrafficSimulator:
             if bus.time_count == self.traffic_condition[bus.station]:
                 bus.arrival()
 
-        # self.bus_states = [(bus.capacity - bus.empty) for bus in self.buses]
         self.state = self.state_to_str() #(tuple(self.states), tuple(self.bus_states))
         self.time += 1
 
-        current_reward = -1 * sum(self.states[:-1]) + extra_bus_fee
+        current_reward = -1 * sum(self.states[:-1])
         self.total_reward += current_reward
 
         # print("PLAYED ACTION", action, self.state, self.states, current_reward, self.total_reward)

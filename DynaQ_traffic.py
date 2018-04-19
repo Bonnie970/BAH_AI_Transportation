@@ -1,17 +1,35 @@
 import numpy as np
 
+# wrapper for a game that is supported by our DynaQ implementation
+# only exposes the information that is required by DynaQ
+class DynaQGame:
+    def __init__(self, game):
+        self.game = game
+    def actions(self):
+        return self.game.actions
+    def game_over(self):
+        return self.game.game_over()
+    def total_reward(self):
+        return self.game.total_reward
+    def buses(self):
+        return self.game.get_num_buses()
+    def state(self):
+        return self.game.state_to_str()
+    def play(self, action):
+        return self.game.play(action)
+    def reset(self):
+        return self.game.reset()
+
 class DynaQ:
     def __init__(self,
                  game,
                  alpha=0.1,
-                 gamma=0.95,
+                 gamma=0.99,
                  epsilon=0.05,
                  n_planning_steps=3,
-                 num_episodes=10000,
+                 num_episodes=2000,
                  verbose=True):
         self.num_episodes = num_episodes
-
-        # step sizeimport numpy as np
 
         self.alpha = alpha
         # discount
@@ -23,10 +41,10 @@ class DynaQ:
 
         self.game = game
 
-        self.actions = self.game.actions
+        self.actions = self.game.actions()
 
         # initial Q(s,a) and Model(s,a)
-        s = self.game.state_to_str()
+        s = self.game.state()
         self.Q = dict()
         self.Q[s] = dict(zip(self.actions, [0]*len(self.actions)))
 
@@ -39,10 +57,9 @@ class DynaQ:
         steps = []
         buses = []
         for episode in range(self.num_episodes):
-
             step = 0
             s = self.game.reset()
-            while not self.game.game_over:
+            while not self.game.game_over():
                 # get action from epslon-greedy
                 a = np.random.choice(e_greedy(self.epsilon, s, self.Q, self.actions), 1)[0]
                 # tell game agent to execute action a
@@ -70,14 +87,15 @@ class DynaQ:
                 s = s_next
                 step += 1
 
-            rewards.append(self.game.total_reward)
+            rewards.append(self.game.total_reward())
             steps.append(step)
-            buses.append(len(self.game.buses))
+            buses.append(self.game.buses())
 
             if self.verbose and episode % 50 == 0:
-                print('Episode {} over, reward: {}, step: {}'.format(episode, self.game.total_reward, step))
+                print('Episode {} over, reward: {}, step: {}, buses {}'.format(
+                    episode, self.game.total_reward(), step, self.game.buses()))
 
-        return rewards, steps, buses
+        return self.num_episodes, rewards, steps, buses
 
 
 class Model:
