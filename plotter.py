@@ -8,7 +8,7 @@ def plotstats(stats_dict,
               test_name="Test",
               x_axis_name="X axis",
               y_axis_name="Y axis",
-              max_savgol_winsize=151,
+              max_savgol_winsize=251,
               min_savgol_winsize=15
               ):
 

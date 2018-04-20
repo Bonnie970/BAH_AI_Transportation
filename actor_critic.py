@@ -3,6 +3,7 @@ import tensorflow as tf
 import itertools
 from matplotlib import pyplot as plt
 from env_transporation_simulator import TrafficSimulator
+from plotter import plotstats
 
 ########################################################################################################################
 
@@ -162,13 +163,17 @@ class ActorCritic:
                  value_estimator,
                  gamma=0.99,
                  num_episodes=100,
-                 max_iters_per_ep=10000
+                 max_iters_per_ep=10000,
+                 epsilon_greedy=0.05
                  ):
         # variables
         self.env = env
+        self.actions = self.env.actions
+
         self.policy_estimator = policy_estimator
         self.value_estimator = value_estimator
         self.gamma = gamma
+        self.epsilon_greedy = epsilon_greedy
         self.num_episodes = num_episodes
         self.max_iters_per_ep = max_iters_per_ep
 
@@ -182,9 +187,24 @@ class ActorCritic:
             for t in itertools.count():
 
                 action_probs = self.policy_estimator.predict(state)
+                print("ACTOR-CRITIC1", action_probs)
+
 
                 action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-                next_state, R, done = self.env.step(action)
+
+                # apply random epsilon greedy action pick
+                if np.random.binomial(1, self.epsilon_greedy) == 1:
+                    # explore; update to a random action
+                    print("HEHHE BOIII")
+                    action = np.random.choice(self.env.action_space_n, 1)[0]
+                else:
+                    # exploit; do nothing
+                    pass
+
+                next_state, R = self.env.play(self.actions[action])
+                done = self.env.game_over()
+
+                print("ACTOR-CRITIC2", action, state, next_state)
 
                 self.stats.add(i_episode, R, t, action)
 
@@ -236,32 +256,10 @@ class TestConfig:
             float2str(self.lambda_trace),
         )
 
-env = TrafficSimulator()
 
-# run cpu only -> this is actually faster on my machine
-config = tf.ConfigProto(
-    device_count={'GPU': 0}
-)
-
-tf.reset_default_graph()
-
-stats_dict = {} # record results here
-with tf.Session(config=config) as sess:
+# runs a single test
+def runSingleTest(env, policy_estimator, value_estimator, gamma, num_episodes, sess):
     sess.run(tf.global_variables_initializer())
-
-    config_name = str(config)
-
-    print("Running tests with configuration: {}".format(config_name))
-
-    policy_estimator = PolicyEstimator(gamma=config.gamma,
-                                       lambda_trace=config.lambda_trace,
-                                       useTrace=config.use_trace_policy,
-                                       tag=config_name)
-
-    value_estimator = ValueEstimator(gamma=config.gamma,
-                                     lambda_trace=config.lambda_trace,
-                                     useTrace=config.use_trace_value,
-                                     tag=config_name)
 
     actor_critic = ActorCritic(env,
                                policy_estimator,
@@ -271,4 +269,91 @@ with tf.Session(config=config) as sess:
 
     actor_critic.run()
 
-    stats = actor_critic.stats
+    return actor_critic.stats
+
+
+# runs many single tests
+def runMultiTests(num_episodes_per_test, configurations):
+    env = TrafficSimulator(state_as_string=False)
+
+    # run cpu only -> this is actually faster on my machine
+    # config = tf.ConfigProto(
+    #     device_count={'GPU': 0}
+    # )
+
+    tf.reset_default_graph()
+
+    stats_dict = {} # record results here
+    with tf.Session() as sess:
+        for config in configurations:
+
+            config_name = str(config)
+
+            print("Running tests with configuration: {}".format(config_name))
+
+            policy_estimator = PolicyEstimator(env=env,
+                                               gamma=config.gamma,
+                                               lambda_trace=config.lambda_trace,
+                                               useTrace=config.use_trace_policy,
+                                               tag=config_name)
+
+            value_estimator = ValueEstimator(env=env,
+                                             gamma=config.gamma,
+                                             lambda_trace=config.lambda_trace,
+                                             useTrace=config.use_trace_value,
+                                             tag=config_name)
+
+            stats_dict[config_name] = runSingleTest(env,
+                                                    policy_estimator,
+                                                    value_estimator,
+                                                    config.gamma,
+                                                    num_episodes_per_test,
+                                                    sess)
+
+            print("")  # print a new line
+
+    return stats_dict
+
+
+# custom test 1
+def runTest1():
+    """
+    this test compares the efficiency of the algorithm when traces are used vs not used
+    """
+    test_name = "Effect of using Traces"
+
+    num_episodes_per_test = 100
+
+    gamma = 0.999
+    lambda_trace = 0.5
+
+    # see TestConfig class for how to change test configurations
+    configurations = [
+        TestConfig(True, True, gamma, lambda_trace),
+    ]
+
+    # run tests and plot results
+    stats_dict = runMultiTests(num_episodes_per_test, configurations)
+    plotstats(stats_dict,
+              num_episodes_per_test,
+              test_name,
+              x_axis_name="Episode",
+              y_axis_name="Reward"
+              )
+
+runTest1()
+
+# tf.reset_default_graph()
+#
+# state_init = np.atleast_2d(np.zeros(16)).reshape((4,4))
+# state_init[1,1] = 1
+#
+# print(state_init)
+#
+# stats_dict = {} # record results here
+# with tf.Session() as sess:
+#     state = tf.placeholder(tf.int32, name="state", shape=(16))
+#     state_one_hot = tf.one_hot(state, 16)
+#
+#     a = sess.run([state_one_hot], feed_dict={state: state_init})
+#     print(a)

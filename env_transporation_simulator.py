@@ -143,6 +143,21 @@ class Environment:
             station = bus.current_station
             self.stations[station].add_passengers(passengers)
 
+    def to_array(self):
+        # column 0: passengers
+        # column 1: buses at each station
+        # column 2: traffic conditions
+        state = np.zeros((self.num_stations, 3))
+        for i in range(self.num_stations):
+            state[i, 0] = len(self.stations[i].passengers)
+            state[i, 2] = self.time_between_stations[i]
+        for bus in self.buses:
+            state[bus.current_station, 1] += 1
+        return state
+
+    def to_number(self):
+        return np.sum(np.array([2**i*(len(station.passengers) > 0) for i, station in enumerate(self.stations)]))
+
     def __str__(self):
         env_strs = ["" for station in self.stations]
         for index, station in enumerate(self.stations):
@@ -160,7 +175,7 @@ class Environment:
 class Actions(Enum):
     WAIT = 'wait'
     ADD_BUS = 'add bus'
-    REMOVE_BUSS = 'remove buss'
+    REMOVE_BUS = 'remove buss'
 
 
 class TrafficSimulator:
@@ -168,6 +183,7 @@ class TrafficSimulator:
                  penalty_per_bus=10,  # cost for starting a new bus
                  penalty_per_missed_passenger=10,
                  time_to_miss_passenger=10,
+                 state_as_string=True
                  ):
         self.env = Environment()
 
@@ -175,19 +191,41 @@ class TrafficSimulator:
         self.time_step = 0
         self.total_reward = 0
 
-        self.actions = [Actions.WAIT, Actions.ADD_BUS, Actions.REMOVE_BUSS]
+        self.actions = [Actions.WAIT, Actions.ADD_BUS, Actions.REMOVE_BUS]
 
         self.penalty_per_bus = penalty_per_bus
+        self.time_to_miss_passenger = time_to_miss_passenger
+        self.penalty_per_missed_passenger = penalty_per_missed_passenger
+
+        self.state_as_string = state_as_string
+
+        # for actor-critic
+        self.observation_space_n = 2 ** self.env.num_stations
+        self.action_space_n = len(self.actions)
 
     def reset(self):
         self.env = Environment()
         self.time_step = 0
         self.total_reward = 0
         self.actions = []
-        return self.state_to_str()
+        return self.get_state()
 
     def get_num_buses(self):
         return len(self.env.buses)
+
+    def play(self, action):
+        print("Playing action", action)
+
+        if action == Actions.WAIT:
+            pass
+        elif action == Actions.ADD_BUS:
+            self.env.add_bus()
+        elif action == Actions.REMOVE_BUS:
+            self.env.remove_bus()
+
+        # simulate environment
+        reward = self.step()
+        return self.get_state(), reward
 
     def step(self):
         reward = 0
@@ -205,27 +243,18 @@ class TrafficSimulator:
 
         # penalty for waiting passengers
         for station in self.env.stations:
+            # base waiting passenger penalty
             reward -= len(station.passengers)
 
-        for station in self.env.stations:
-
+            # strong waiting passenger penalty if waiting for a prolonged amount of time
+            for passenger_id in station.passengers:
+                passenger = station.passengers[passenger_id]
+                if self.time_step - passenger.start_time_step > self.time_to_miss_passenger:
+                    reward -= self.penalty_per_missed_passenger
 
         self.total_reward += reward
 
         return reward
-
-    def play(self, action):
-
-        if action == Actions.WAIT:
-            pass
-        elif action == Actions.ADD_BUS:
-            self.env.add_bus()
-        elif action == Actions.REMOVE_BUSS:
-            self.env.remove_bus()
-
-        # simulate environment
-        reward = self.step()
-        return self.state_to_str(), reward
 
     def game_over(self):
         passengers_left = 0
@@ -233,15 +262,29 @@ class TrafficSimulator:
             passengers_left += len(station.passengers)
         return passengers_left == 0
 
+    def state_to_num(self):
+        return self.env.to_number()
+
     def state_to_str(self):
-        s = str(self.env)
-        return s
+        return str(self.env)
+
+    def get_state(self):
+        return self.state_to_str() if self.state_as_string else self.state_to_num()
 
 
-# sim = TrafficSimulator()
-# import time
-# for i in range(1000):
-#     time.sleep(0.25)
-#     sim.play("a")
-#     print("\r[{}] {}".format('-' if i%2==0 else '+', sim.state_to_str()), end='')
+def main():
+    sim = TrafficSimulator()
+    sim.play(Actions.ADD_BUS)
+    import time
+    for i in range(1000):
+        time.sleep(1)
+        sim.play(Actions.WAIT)
+        print(sim.state_to_str())
+        print(sim.state_to_num())
+        print("")
+        # print("\r[{}] {}".format('-' if i%2==0 else '+', sim.state_to_str()), end='')
+
+
+if __name__=="__main__":
+    main()
 
