@@ -1,16 +1,19 @@
 import numpy as np
 
 class DynaQ:
-    def __init__(self, game):
+    def __init__(self, game, alpha=0.3, gamma=0.95, epslon=0.01, planning_step=5,\
+                 n_eps=100, verbose=False):
         # step sizeimport numpy as np
 
-        self.alpha = 0.7  # 0.1
+        self.alpha = alpha
         # discount
-        self.gamma = 0.95
+        self.gamma = gamma
         # greed algorithm factor
-        self.epslon = 0.1
+        self.epslon = epslon
         # planning steps
-        self.n = 5
+        self.n = planning_step
+        # number of episode to learn
+        self.n_eps = n_eps
 
         self.mazeIndex = 0
         self.changeMaze = False
@@ -33,10 +36,13 @@ class DynaQ:
         self.Q[self.s] = dict(zip(self.actions, [0]*len(self.actions)))
         self.model = Model()
 
-        self.verbose = False
+        self.verbose = verbose
 
     def run(self):
+        for _ in range(self.n_eps):
+            self.run_one_eps()
 
+    def run_one_eps(self):
         while not self.game.game_over:
             # current state
             s = self.s
@@ -79,14 +85,13 @@ class DynaQ:
             self.s = s_next
 
         if self.game.game_over:
-            self.episode += 1
             if self.verbose:
                 print('Episode {} over, reward: {}, step: {}'.format(self.episode, self.game.total_reward, self.steps))
             self.results.append([self.game.total_reward, self.episode])
             self.game.reset()
             self.s = self.game.twostates
             self.steps = 0
-
+            self.episode += 1
 
 class Model:
     def __init__(self):
@@ -118,7 +123,9 @@ class Model:
 def e_greedy(epslon, s, Q, actions):
     # explore
     if np.random.binomial(1, epslon) == 1:
-        return np.random.choice(list(actions), 1)
+        action = np.random.choice(list(actions), 1)
+        print("Explore ... ", action)
+        return action
     else:
         # exploit
         max_value = max(Q[s].values())

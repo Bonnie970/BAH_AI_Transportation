@@ -1,28 +1,23 @@
-import DynaQ_traffic
-import matplotlib.pyplot as plot
-import traffic_env
+from DynaQ_traffic import DynaQ
+from traffic_env import TrafficSimulator
+from plotter import plotstats
 
-game = traffic_env.TrafficSimulator(bus_cost=50)
+# [20, 150, 50, 35, 0] fails to converge
+states=[20, 100, 30, 5, 0]
+goal_state=[0, 0, 0, 0, sum(states)]
+game = TrafficSimulator(bus_cost=30,
+                        states=states,
+                        goal_state=goal_state)
 
-n_eps = 300
+# !!! low alpha converges better
+# !!! explore less in simple case --> explore more in complex case
+dynaq = DynaQ(game, alpha=0.1, gamma=0.95, \
+              epslon=0.1, planning_step=5, n_eps=5000, verbose=True)
 
-dynaq = DynaQ_traffic.DynaQ(game)
+dynaq.run()
 
-# set parameters
-# this parameter defines how many steps dynaq learns from experiences
-dynaq.n = 0
-dynaq.alpha = 0.9
-dynaq.epslon = 0.01
-dynaq.verbose = True
+rewards = [x[0] for x in dynaq.results]
+n_eps = len(dynaq.results)
 
-for _ in range(n_eps):
-  dynaq.run()
-
-reward = [x[0] for x in dynaq.results]
-eps = [x[1] for x in dynaq.results]
-
-plot.plot(eps, reward)
-plot.xlabel('Episode')
-plot.ylabel('Cumulative reward')
-plot.legend()
-plot.show()
+plotstats({"Configuration 1": rewards}, n_eps, \
+          x_axis_name="Episodes", y_axis_name="Rewards")
