@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 # wrapper for a game that is supported by our DynaQ implementation
 # only exposes the information that is required by DynaQ
@@ -25,17 +26,21 @@ class DynaQ:
                  game,
                  alpha=0.1,
                  gamma=0.99,
-                 epsilon=0.05,
+                 epsilon=0.1,
+                 epsilon_decay=0.999,
                  n_planning_steps=3,
-                 num_episodes=2000,
+                 num_episodes=250,
+                 max_steps_per_episode=2000,
                  verbose=True):
         self.num_episodes = num_episodes
+        self.max_steps_per_episode = max_steps_per_episode
 
         self.alpha = alpha
         # discount
         self.gamma = gamma
         # greed algorithm factor
         self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
         # planning steps
         self.n_planning_steps = n_planning_steps
 
@@ -59,9 +64,11 @@ class DynaQ:
         for episode in range(self.num_episodes):
             step = 0
             s = self.game.reset()
-            while not self.game.game_over():
+            while not self.game.game_over() and (self.max_steps_per_episode < 0 or step < self.max_steps_per_episode):
+                # time1 = time.time()
+
                 # get action from epslon-greedy
-                a = np.random.choice(e_greedy(self.epsilon, s, self.Q, self.actions), 1)[0]
+                a = np.random.choice(e_greedy(self.epsilon * self.epsilon_decay ** step, s, self.Q, self.actions), 1)[0]
                 # tell game agent to execute action a
                 s_next, r = self.game.play(a)
 
@@ -86,14 +93,15 @@ class DynaQ:
                 # current state is next state
                 s = s_next
                 step += 1
+                # print("episode", time.time()-time1)
 
             rewards.append(self.game.total_reward())
-            steps.append(step)
             buses.append(self.game.buses())
+            steps.append(step)
 
-            if self.verbose and episode % 50 == 0:
-                print('Episode {} over, reward: {}, step: {}, buses {}'.format(
-                    episode, self.game.total_reward(), step, self.game.buses()))
+            if self.verbose and episode % 10 == 0:
+                print('Episode {} over, reward: {}, step: {}, buses {}, model {}'.format(
+                    episode, self.game.total_reward(), step, self.game.buses(), 0))
 
         return self.num_episodes, rewards, steps, buses
 
