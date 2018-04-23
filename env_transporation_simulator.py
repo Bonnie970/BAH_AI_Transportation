@@ -430,6 +430,9 @@ class TrafficSimulator:
 
     def get_state(self):
         return self.state_to_str() if self.state_as_string else self.state_to_num()
+        
+    def set_traffic_incident(self,station=3,delay=30):
+        self.env.set_delay_between_stations(station=station, delay_in_minutes=delay)
 
 
 def main():

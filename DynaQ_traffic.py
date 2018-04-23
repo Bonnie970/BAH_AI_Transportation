@@ -20,6 +20,8 @@ class DynaQGame:
         return self.game.play(action)
     def reset(self):
         return self.game.reset()
+    def set_traffic_incident(self,station,delay):
+        return self.game.set_traffic_incident(station,delay)
 
 class DynaQ:
     def __init__(self,
@@ -30,9 +32,11 @@ class DynaQ:
                  epsilon_decay=0.999,
                  n_planning_steps=3,
                  num_episodes=500, #100, 250, 500
+                 traffic_singularity=250,
                  max_steps_per_episode=2000,
                  verbose=True):
         self.num_episodes = num_episodes
+        self.traffic_singularity = traffic_singularity
         self.max_steps_per_episode = max_steps_per_episode
 
         self.alpha = alpha
@@ -64,6 +68,11 @@ class DynaQ:
         for episode in range(self.num_episodes):
             step = 0
             s = self.game.reset()
+            #Hardcoded where the delay occurs, and how long it is
+            #at station 3, and 30min
+            if episode>=self.traffic_singularity:
+                self.game.set_traffic_incident(3,50)
+                
             while not self.game.game_over() and (self.max_steps_per_episode < 0 or step < self.max_steps_per_episode):
                 # time1 = time.time()
 
