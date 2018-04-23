@@ -29,7 +29,7 @@ class DynaQ:
                  epsilon=0.1,
                  epsilon_decay=0.999,
                  n_planning_steps=3,
-                 num_episodes=250,
+                 num_episodes=500, #100, 250, 500
                  max_steps_per_episode=2000,
                  verbose=True):
         self.num_episodes = num_episodes
@@ -94,6 +94,9 @@ class DynaQ:
                 s = s_next
                 step += 1
                 # print("episode", time.time()-time1)
+                if self.verbose and episode % 10 == 0:
+                    print(s)
+                    print(a)
 
             rewards.append(self.game.total_reward())
             buses.append(self.game.buses())
@@ -102,6 +105,7 @@ class DynaQ:
             if self.verbose and episode % 10 == 0:
                 print('Episode {} over, reward: {}, step: {}, buses {}, model {}'.format(
                     episode, self.game.total_reward(), step, self.game.buses(), 0))
+                print('Size of Q: {}'.format(len(self.Q)))
 
         return self.num_episodes, rewards, steps, buses
 

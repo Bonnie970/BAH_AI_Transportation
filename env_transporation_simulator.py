@@ -282,8 +282,9 @@ class Environment:
         for index, station in enumerate(self.stations):
             station_str = '' + str(len(station.passengers) > 0) if self.state_string_num_passenger_as_bool else \
                 str(len(station.passengers))
-            env_strs[index] += '({})'.format(station_str) + \
-                               '-[t{}]-'.format(self.minutes_between_stations[index])
+            #env_strs[index] += '({})'.format(station_str) + \
+            #                   '-[t{}]-'.format(self.minutes_between_stations[index])
+            env_strs[index] += '({})'.format(station_str)
         env_str = '<'
         if not self.state_string_buses_as_single_number:
             for bus in self.buses:
@@ -300,6 +301,8 @@ class Environment:
 class Actions(Enum):
     WAIT = 'wait'
     ADD_BUS = 'add bus'
+    #Adding rescue bus, deploys at station 4
+    RESCUE = 'rescue'
 
 
 class TrafficSimulator:
@@ -320,7 +323,7 @@ class TrafficSimulator:
 
         self.total_reward = 0
 
-        self.actions = [Actions.WAIT, Actions.ADD_BUS]
+        self.actions = [Actions.WAIT, Actions.ADD_BUS, Actions.RESCUE]
 
         self.penalty_per_bus = penalty_per_bus
         self.penalty_per_bus_added = penalty_per_bus_added
@@ -348,12 +351,14 @@ class TrafficSimulator:
         return len(self.env.buses)
 
     def play(self, action):
-        # print("Playing action", action)
+        #print("Playing action", action)
 
         if action == Actions.WAIT:
             pass
         elif action == Actions.ADD_BUS:
             self.env.add_bus()
+        elif action == Actions.RESCUE:
+            self.env.add_bus(station=4)
 
         # simulate environment
         reward = self.step(action)
@@ -365,6 +370,9 @@ class TrafficSimulator:
 
         if action == Actions.ADD_BUS:
             reward -= self.penalty_per_bus_added
+        #Make this more expensive than standard operation
+        if action == Actions.RESCUE:
+            reward -= 2*self.penalty_per_bus_added
 
         # reward for delivered passengers
         for bus in self.env.buses:
