@@ -148,10 +148,13 @@ class Environment:
     def __init__(self,
                  num_stations=10,
                  default_minutes_between_stations=10,
-                 state_string_num_passenger_as_bool=False,
+                 state_string_num_passenger_as_bool=True,
+                 state_string_buses_as_single_number=True
                  ):
         self.num_stations = num_stations
+
         self.state_string_num_passenger_as_bool = state_string_num_passenger_as_bool
+        self.state_string_buses_as_single_number = state_string_buses_as_single_number
 
         self.current_time_in_minutes = 0
         self.stations = [Station() for _ in range(num_stations)]
@@ -281,9 +284,12 @@ class Environment:
                 str(len(station.passengers))
             env_strs[index] += '({})'.format(station_str) + \
                                '-[t{}]-'.format(self.minutes_between_stations[index])
-        for bus in self.buses:
-            env_strs[bus.current_station] += 'b-'
-        env_str = ">"
+        env_str = '<'
+        if not self.state_string_buses_as_single_number:
+            for bus in self.buses:
+                env_strs[bus.current_station] += 'b-'
+        else:
+            env_str += "b" + str(len(self.buses)) + ':'
         for s in env_strs:
             env_str += s
         env_str += '>'
