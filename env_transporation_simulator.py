@@ -37,6 +37,7 @@ class Bus:
         self.env = env
         self.current_station = current_station
         self.minutes_to_destination = self.env.minutes_between_stations[current_station]
+        self.active = True # set this to false and env should clean this bus up
 
         self.passengers_max_capacity = passengers_max_capacity
         self.passengers = []
@@ -77,16 +78,21 @@ class Bus:
 
     def next_time_step(self, minutes_per_time_step):
         # print("BUS:", self.time_to_destination, self.current_station, len(self.passengers))
-        if self.minutes_to_destination <= 0:
-            self.current_station = (self.current_station + 1) % self.env.num_stations
-            self.minutes_to_destination = self.env.minutes_between_stations[self.current_station]
+        if self.active:
+            if self.minutes_to_destination <= 0:
+                self.current_station = self.current_station + 1
+                if self.current_station >= self.env.num_stations:
+                    self.current_station = 0
+                    self.active = False
 
-            unloaded_passengers = self.unload_passengers()
-            loaded_passengers = self.load_passengers()
+                delivered_passengers = self.unload_passengers()
+                loaded_passengers = self.load_passengers()
 
-            return unloaded_passengers, loaded_passengers
+                self.minutes_to_destination = self.env.minutes_between_stations[self.current_station]
 
-        self.minutes_to_destination -= minutes_per_time_step
+                return delivered_passengers, loaded_passengers
+
+            self.minutes_to_destination -= minutes_per_time_step
 
         return [], []
 
@@ -108,6 +114,25 @@ class DailyPassengerSchedule:
             self.scheduled_passengers[time_in_minutes] = []
         self.scheduled_passengers[time_in_minutes].append((start_station, destination_station, number_of_passengers))
 
+    def schedule_n_random_trajectories(self,
+                                      num_stations,  # how many stations are in the environment
+                                      time_in_minutes,
+                                      num_passenger_trajectories=1,  # number of different source-destination pairs
+                                      num_passenger_trajectories_delta=0,
+                                      max_num_passengers_per_trajectory=5,  # gen between 1 and max_num passengers
+                                     ):
+        time_in_minutes %= self.minutes_in_a_day
+        num_passenger_trajectories += -num_passenger_trajectories_delta + \
+                                      np.random.randint(2 * num_passenger_trajectories_delta + 1)
+        for i in range(num_passenger_trajectories):
+            start_station = np.random.randint(num_stations)
+            destination_station = start_station
+            # make sure start station is not the same as the destination station
+            while destination_station == start_station:
+                destination_station = np.random.randint(num_stations)
+            number_of_passengers = 1 + np.random.randint(max_num_passengers_per_trajectory)
+            self.schedule_passenger(time_in_minutes, number_of_passengers, start_station, destination_station)
+
     # assumes time_previous and time_current are on the same day
     def get_scheduled_passengers_between(self, time_previous, time_current):
         time_previous %= self.minutes_in_a_day
@@ -123,14 +148,14 @@ class Environment:
     def __init__(self,
                  num_stations=10,
                  default_minutes_between_stations=10,
+                 state_string_num_passenger_as_bool=False,
                  ):
         self.num_stations = num_stations
+        self.state_string_num_passenger_as_bool = state_string_num_passenger_as_bool
 
         self.current_time_in_minutes = 0
-
         self.stations = [Station() for _ in range(num_stations)]
         self.minutes_between_stations = [default_minutes_between_stations for _ in range(num_stations)]
-
         self.buses = []
 
         self.schedule = DailyPassengerSchedule()
@@ -222,16 +247,6 @@ class Environment:
             bus = Bus(env=self, current_station=station)
         self.buses.append(bus)
 
-    def remove_bus(self):
-        if len(self.buses) >= 1:
-            # remove the first bus
-            bus = self.buses.pop(0)
-            # get passengers currently on the bus
-            passengers = bus.unload_all_passengers()
-            # add unloaded passengers to the station the bus was last at
-            station = bus.current_station
-            self.stations[station].add_passengers(passengers)
-
     def next_time_step(self, minutes_per_time_step):
         time_previous = self.current_time_in_minutes
         self.current_time_in_minutes += minutes_per_time_step
@@ -262,7 +277,9 @@ class Environment:
     def __str__(self):
         env_strs = ["" for station in self.stations]
         for index, station in enumerate(self.stations):
-            env_strs[index] += '({})'.format(str(len(station.passengers))) + \
+            station_str = '' + str(len(station.passengers) > 0) if self.state_string_num_passenger_as_bool else \
+                str(len(station.passengers))
+            env_strs[index] += '({})'.format(station_str) + \
                                '-[t{}]-'.format(self.minutes_between_stations[index])
         for bus in self.buses:
             env_strs[bus.current_station] += 'b-'
@@ -277,7 +294,6 @@ class Environment:
 class Actions(Enum):
     WAIT = 'wait'
     ADD_BUS = 'add bus'
-    REMOVE_BUS = 'remove bus'
 
 
 class TrafficSimulator:
@@ -287,7 +303,8 @@ class TrafficSimulator:
                  penalty_per_missed_passenger=10,
                  minutes_to_miss_passenger=60,
                  state_as_string=True,
-                 goal_delivered_passengers=500
+                 goal_delivered_passengers=500,
+                 penalty_per_bus_added=5,
                  ):
         self.env = Environment()
 
@@ -297,10 +314,10 @@ class TrafficSimulator:
 
         self.total_reward = 0
 
-        self.actions = [Actions.WAIT, Actions.ADD_BUS, Actions.REMOVE_BUS]
+        self.actions = [Actions.WAIT, Actions.ADD_BUS]
 
         self.penalty_per_bus = penalty_per_bus
-
+        self.penalty_per_bus_added = penalty_per_bus_added
         self.minutes_to_miss_passenger = minutes_to_miss_passenger
         self.penalty_per_missed_passenger = penalty_per_missed_passenger
 
@@ -331,23 +348,33 @@ class TrafficSimulator:
             pass
         elif action == Actions.ADD_BUS:
             self.env.add_bus()
-        elif action == Actions.REMOVE_BUS:
-            self.env.remove_bus()
 
         # simulate environment
-        reward = self.step()
+        reward = self.step(action)
 
         return self.get_state(), reward
 
-    def step(self):
+    def step(self, action):
         reward = 0
+
+        if action == Actions.ADD_BUS:
+            reward -= self.penalty_per_bus_added
 
         # reward for delivered passengers
         for bus in self.env.buses:
-            unloaded_passengers, loaded_passengers = bus.next_time_step(self.minutes_per_time_step)
+            delivered_passengers, loaded_passengers = bus.next_time_step(self.minutes_per_time_step)
 
-            self.delivered_passengers += len(unloaded_passengers)
-            reward += len(unloaded_passengers)
+            self.delivered_passengers += len(delivered_passengers)
+            reward += len(delivered_passengers)
+
+        # remove inactive buses
+        num_buses_removed = 0
+        for i in range(len(self.env.buses)):
+            bus_num = i - num_buses_removed
+            if not self.env.buses[bus_num].active:
+                num_buses_removed += 1
+                bus = self.env.buses.pop(bus_num)
+                self.unload_bus(bus)
 
         # penalty for each bus
         for bus in self.env.buses:
@@ -370,6 +397,13 @@ class TrafficSimulator:
         self.env.next_time_step(self.minutes_per_time_step)
 
         return reward
+
+    def unload_bus(self, bus):
+        # get passengers currently on the bus
+        passengers = bus.unload_all_passengers()
+        # add unloaded passengers to the station the bus was last at
+        station = bus.current_station
+        self.env.stations[station].add_passengers(passengers)
 
     def game_over(self):
         return self.delivered_passengers > self.goal_delivered_passengers
