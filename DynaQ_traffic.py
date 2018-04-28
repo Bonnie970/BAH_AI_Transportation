@@ -1,97 +1,123 @@
 import numpy as np
+import time
+
+# wrapper for a game that is supported by our DynaQ implementation
+# only exposes the information that is required by DynaQ
+class DynaQGame:
+    def __init__(self, game):
+        self.game = game
+    def actions(self):
+        return self.game.actions
+    def game_over(self):
+        return self.game.game_over()
+    def total_reward(self):
+        return self.game.total_reward
+    def buses(self):
+        return self.game.get_num_buses()
+    def state(self):
+        return self.game.state_to_str()
+    def play(self, action):
+        return self.game.play(action)
+    def reset(self):
+        return self.game.reset()
+    def set_traffic_incident(self,station,delay):
+        return self.game.set_traffic_incident(station,delay)
 
 class DynaQ:
-    def __init__(self, game, alpha=0.3, gamma=0.95, epslon=0.01, planning_step=5,\
-                 n_eps=100, verbose=False):
-        # step sizeimport numpy as np
+    def __init__(self,
+                 game,
+                 alpha=0.1,
+                 gamma=0.99,
+                 epsilon=0.1,
+                 epsilon_decay=0.999,
+                 n_planning_steps=3,
+                 num_episodes=500, #100, 250, 500
+                 traffic_singularity=250,
+                 max_steps_per_episode=2000,
+                 verbose=True):
+        self.num_episodes = num_episodes
+        self.traffic_singularity = traffic_singularity
+        self.max_steps_per_episode = max_steps_per_episode
 
         self.alpha = alpha
         # discount
         self.gamma = gamma
         # greed algorithm factor
-        self.epslon = epslon
+        self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
         # planning steps
-        self.n = planning_step
-        # number of episode to learn
-        self.n_eps = n_eps
-
-        self.mazeIndex = 0
-        self.changeMaze = False
+        self.n_planning_steps = n_planning_steps
 
         self.game = game
-        self.episode = 0
 
-        # get initial state of game
-        self.s = self.game.twostates
-
-        # cumulative reward, steps
-        self.steps = 0
-        self.results = [[self.game.total_reward, self.episode]]
-
-        self.actions = self.game.actions
+        self.actions = self.game.actions()
 
         # initial Q(s,a) and Model(s,a)
+        s = self.game.state()
         self.Q = dict()
-        print(self.s, type(self.s))
-        self.Q[self.s] = dict(zip(self.actions, [0]*len(self.actions)))
+        self.Q[s] = dict(zip(self.actions, [0]*len(self.actions)))
+
         self.model = Model()
 
         self.verbose = verbose
 
     def run(self):
-        for _ in range(self.n_eps):
-            self.run_one_eps()
+        rewards = []
+        steps = []
+        buses = []
+        for episode in range(self.num_episodes):
+            step = 0
+            s = self.game.reset()
+            #Hardcoded where the delay occurs, and how long it is
+            #at station 3, and 30min
+            if episode>=self.traffic_singularity:
+                self.game.set_traffic_incident(3,50)
+                
+            while not self.game.game_over() and (self.max_steps_per_episode < 0 or step < self.max_steps_per_episode):
+                # time1 = time.time()
 
-    def run_one_eps(self):
-        while not self.game.game_over:
-            # current state
-            s = self.s
-            # get action from epslon-greedy
-            a = np.random.choice(e_greedy(self.epslon, s, self.Q, self.actions), 1)[0]
+                # get action from epslon-greedy
+                a = np.random.choice(e_greedy(self.epsilon * self.epsilon_decay ** step, s, self.Q, self.actions), 1)[0]
+                # tell game agent to execute action a
+                s_next, r = self.game.play(a)
 
-            # tell game agent to execute action a
-            s_next, r = self.game.play(a)
-            # print('#A: ', a, ' s_next: ', s_next, ' r: ', r)
+                # print("state", s_next, r)
 
-            self.steps += 1
+                # State-value: allocate space for new state and action
+                for state_q in [s, s_next]:
+                    if state_q not in self.Q.keys():
+                        self.Q[state_q] = dict(zip(self.actions, [0]*len(self.actions)))
 
-            if self.verbose:
-                if self.steps % 1000 == 0:
-                    print(self.steps)
-                    print(s, a, s_next, r)
+                # update State-value
+                self.Q[s][a] += self.alpha * (r + self.gamma * max(self.Q[s_next].values()) - self.Q[s][a])
 
-            # State-value: allocate space for new state and action
-            for involving_state in [s, s_next]:
-                if involving_state not in self.Q.keys():
-                    self.Q[involving_state] = dict(zip(self.actions, [0]*len(self.actions)))
+                # update model
+                self.model.insert(s, a, s_next, r)
 
-            # update State-value
-            self.Q[s][a] += self.alpha * (\
-                r + self.gamma * max(self.Q[s_next].values()) \
-                - self.Q[s][a])
-            #print('Q UPDATING', self.Q)
+                # update Q using simulated experience from model
+                for _ in range(self.n_planning_steps):
+                    ss, sa, ss_next, sr = self.model.get_simulate_experience()
+                    self.Q[ss][sa] += self.alpha * (sr + self.gamma * max(self.Q[ss_next].values()) - self.Q[ss][sa])
 
-            # update model
-            self.model.insert(s, a, s_next, r)
+                # current state is next state
+                s = s_next
+                step += 1
+                # print("episode", time.time()-time1)
+                if self.verbose and episode % 10 == 0:
+                    print(s)
+                    print(a)
 
-            # update Q using simulated experience from model
-            for _ in range(self.n):
-                ss, sa, ss_next, sr = self.model.get_simulate_experience()
-                self.Q[ss][sa] += self.alpha * ( \
-                    sr + self.gamma * max(self.Q[ss_next].values()) \
-                    - self.Q[ss][sa])
+            rewards.append(self.game.total_reward())
+            buses.append(self.game.buses())
+            steps.append(step)
 
-            # current state is next state
-            self.s = s_next
+            if self.verbose and episode % 10 == 0:
+                print('Episode {} over, reward: {}, step: {}, buses {}, model {}'.format(
+                    episode, self.game.total_reward(), step, self.game.buses(), 0))
+                print('Size of Q: {}'.format(len(self.Q)))
 
-        if self.game.game_over:
-            if self.verbose:
-                print('Episode {} over, reward: {}, step: {}'.format(self.episode, self.game.total_reward, self.steps))
-            self.results.append([self.game.total_reward, self.episode])
-            self.game.reset()
-            self.s = self.game.twostates
-            self.steps = 0
-            self.episode += 1
+        return self.num_episodes, rewards, steps, buses
+
 
 class Model:
     def __init__(self):
@@ -120,12 +146,10 @@ class Model:
         return s, a, s_next, r
 
 
-def e_greedy(epslon, s, Q, actions):
-    # explore
-    if np.random.binomial(1, epslon) == 1:
-        action = np.random.choice(list(actions), 1)
-        print("Explore ... ", action)
-        return action
+def e_greedy(epsilon, s, Q, actions):
+    if np.random.binomial(1, epsilon) == 1:
+        # explore
+        return np.random.choice(list(actions), 1)
     else:
         # exploit
         max_value = max(Q[s].values())
